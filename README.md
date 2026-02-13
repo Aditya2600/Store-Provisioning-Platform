@@ -2,13 +2,15 @@
 
 A Kubernetes-native platform for provisioning isolated e-commerce stores (WooCommerce) on command.
 
-## 📦 Deliverables
+## 📦 Deliverables (in the repo)
 
-### Source Code
-- **Dashboard**: [`apps/dashboard`](apps/dashboard) (React + Vite + Tailwind/Lucide)
-- **Backend API**: [`apps/api`](apps/api) (FastAPI)
-- **Orchestration**: [`controller/operator.py`](controller/operator.py) (Kopf/Python)
-- **Helm Charts**: [`charts/`](charts/) (Platform & Store charts)
+### README includes
+- **Local setup instructions**: see **Setup Instructions → Local Setup (Kind)** below.
+- **VPS / production-like setup**: see **Setup Instructions → VPS / Production-like Setup (k3s)** below.
+- **How to create a store + place an order**: see **How to Use** below.
+- **Source code**: Dashboard [`apps/dashboard`](apps/dashboard); Backend API [`apps/api`](apps/api); Provisioning/Orchestration [`controller/operator.py`](controller/operator.py).
+- **Helm charts + values**: Platform [`charts/platform`](charts/platform); Store charts [`charts/woocommerce`](charts/woocommerce), [`charts/medusa`](charts/medusa); Values `charts/platform/values.yaml`, `charts/platform/values-local.yaml`, `charts/platform/values-prod.yaml`.
+- **System design & tradeoffs note**: see **System Design & Tradeoffs** below.
 
 ---
 
