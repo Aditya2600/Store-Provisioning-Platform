@@ -1,7 +1,7 @@
 # Urumi Store Provisioning Platform (Round 1)
 
 Kubernetes-native platform for provisioning isolated e-commerce stores on demand.
-This README now includes the operational and design notes from:
+operational and design notes:
 - `docs/operations.md`
 - `docs/system-design-tradeoffs.md`
 
