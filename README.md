@@ -1,136 +1,303 @@
 # Urumi Store Provisioning Platform (Round 1)
 
-A Kubernetes-native platform for provisioning isolated e-commerce stores (WooCommerce) on command.
-
-## 📦 Deliverables (in the repo)
-
-### README includes
-- **Local setup instructions**: see **Setup Instructions → Local Setup (Kind)** below.
-- **VPS / production-like setup**: see **Setup Instructions → VPS / Production-like Setup (k3s)** below.
-- **How to create a store + place an order**: see **How to Use** below.
-- **Source code**: Dashboard [`apps/dashboard`](apps/dashboard); Backend API [`apps/api`](apps/api); Provisioning/Orchestration [`controller/operator.py`](controller/operator.py).
-- **Helm charts + values**: Platform [`charts/platform`](charts/platform); Store charts [`charts/woocommerce`](charts/woocommerce), [`charts/medusa`](charts/medusa); Values `charts/platform/values.yaml`, `charts/platform/values-local.yaml`, `charts/platform/values-prod.yaml`.
-- **System design & tradeoffs note**: see **System Design & Tradeoffs** below.
-
----
+Kubernetes-native platform for provisioning isolated e-commerce stores on demand.
+This README now includes the operational and design notes from:
+- `docs/operations.md`
+- `docs/system-design-tradeoffs.md`
 
 ## Demo
 
-**Dashboard**
+Dashboard:
 ![Dashboard](assets/dashboard.png)
 
-**Storefront**
+Storefront:
 ![Storefront](assets/store.png)
 
----
+## Source Code Layout
 
-## 🚀 Setup Instructions
+- Dashboard (frontend): `apps/dashboard`
+- Backend API: `apps/api`
+- Provisioning/orchestration controller: `controller/operator.py`
+- Platform chart: `charts/platform`
+- Store charts: `charts/woocommerce`, `charts/medusa`
 
-### 1. Local Setup (Kind)
-The easiest way to run the platform locally.
+## Flow Diagrams
 
-**Prerequisites:** Docker, Kubectl, Helm, Kind.
+### Control-plane architecture flow
 
-**Steps:**
-1. Run the setup script:
-   ```bash
-   ./setup.sh
-   ```
-   *This handles cluster creation, image building, ingress installation, and platform deployment.*
+```mermaid
+flowchart LR
+  U[User] --> D[Dashboard]
+  D --> API[Platform API]
+  API --> CR[(Store CR)]
+  CR --> OP[Store Controller]
+  OP --> NS[store-<STORE_ID> namespace]
+  OP --> HELM[helm upgrade --install]
+  HELM --> WC[WooCommerce release]
+  WC --> URL[store URL]
+  API --> EVT[Status and events]
+  EVT --> D
+```
 
-2. Access the platform:
-   - **Dashboard**: [http://dashboard.127.0.0.1.nip.io](http://dashboard.127.0.0.1.nip.io)
-   - **API**: [http://api.127.0.0.1.nip.io](http://api.127.0.0.1.nip.io/docs)
+### Store lifecycle flow (provisioning to cleanup)
 
-### 2. VPS / Production-like Setup (k3s)
-To deploy on a remote VPS (e.g., DigitalOcean, AWS EC2) using `k3s`.
+```mermaid
+stateDiagram-v2
+  [*] --> Provisioning: Create store request
+  Provisioning --> Ready: Helm deploy + health checks pass
+  Provisioning --> Failed: Provision timeout or deploy error
+  Failed --> Provisioning: Reconcile retry / operator resume
+  Ready --> Deleting: Delete store request
+  Deleting --> Deleted: Finalizer cleanup complete
+  Deleted --> [*]
+```
 
-**Steps:**
-1. **Install k3s**:
-   ```bash
-   curl -sfL https://get.k3s.io | sh -
-   ```
-2. **Build & Push Images**:
-   Build the images locally and push them to a container registry (Docker Hub, GHCR, ECR).
-   ```bash
-   docker build -t your-repo/platform-api:latest -f apps/api/Dockerfile .
-   docker build -t your-repo/store-controller:latest -f controller/Dockerfile .
-   docker build --build-arg VITE_API_BASE=http://api.your-domain.com -t your-repo/dashboard:latest apps/dashboard
-   
-   docker push your-repo/platform-api:latest
-   docker push your-repo/store-controller:latest
-   docker push your-repo/dashboard:latest
-   ```
-3. **Configure Values**:
-   Create a `values-prod.yaml` for the platform chart:
-   ```yaml
-   baseDomain: "your-domain.com"
-   images:
-     api: "your-repo/platform-api:latest"
-     controller: "your-repo/store-controller:latest"
-     dashboard: "your-repo/dashboard:latest"
-   ingressClassName: "traefik" # k3s uses traefik by default
-   ```
-4. **Deploy**:
-   ```bash
-   helm upgrade --install store-platform charts/platform \
-     -n store-platform --create-namespace \
-     -f values-prod.yaml
-   ```
+### Shopper order flow
 
----
+```mermaid
+sequenceDiagram
+  actor Shopper
+  participant Store as Storefront
+  participant Checkout as WooCommerce Checkout
+  participant Backend as WordPress/Woo Backend
 
-## 🛒 How to Use
+  Shopper->>Store: Browse catalog
+  Shopper->>Store: Add item to cart
+  Shopper->>Checkout: Submit checkout
+  Checkout->>Backend: Create order record
+  Backend-->>Shopper: Order confirmation
+```
 
-### Create a Store
-1. Open the **Dashboard**.
-2. Enter a unique **Store ID** (e.g., `fashion-boutique`).
-3. Select **WooCommerce** as the engine.
-4. Click **Launch Store**.
-5. Watch the status move from `Provisioning` → `Ready`.
+## Setup Instructions
 
-### Place an Order (Manual Verification)
-1. Once `Ready`, click **Visit Store** in the dashboard.
-2. (Optional) Log in to `/wp-admin` using the `admin` credentials stored in the store's namespace Secret (`store-fashion-boutique/store-admin`).
-3. Browse the shop, add a product to the cart.
-4. Proceed to checkout and place an order (Cash on Delivery is enabled by default in our automation, or enable it manually).
+### Local setup (Kind)
 
----
+Prerequisites:
+- Docker
+- kubectl
+- Helm
+- Kind
 
-## ⚙️ Helm Charts & Configuration
+Recommended one-command setup:
 
-### Platform Chart (`charts/platform`)
-Deploys the core infrastructure: Dashboard, API, and Controller.
+```bash
+./setup.sh
+```
 
-- **Values Files**:
-  - `values.yaml`: Default settings.
-  - `values-local.yaml`: Overrides for local `kind` dev (local images, `nip.io` domain).
-  - *(Create your own `values-prod.yaml` for VPS deployment)*.
+Manual Helm install (equivalent local profile):
 
-### Store Charts (`charts/woocommerce`, `charts/medusa`)
-Templated deployments for individual stores.
+```bash
+helm upgrade --install store-platform charts/platform \
+  --namespace store-platform --create-namespace \
+  -f charts/platform/values-local.yaml
+```
 
-- **WooCommerce**: Wrapper around `bitnami/wordpress`.
-- **Medusa**: Stubbed for Round 1.
+Access endpoints:
+- Dashboard: `http://dashboard.127.0.0.1.nip.io`
+- API docs: `http://api.127.0.0.1.nip.io/docs`
 
----
+### VPS / production-like setup (k3s)
 
-## 🏗️ System Design & Tradeoffs
+1. Install k3s on your VPS.
 
-### Architecture Choice
-We chose a **Kubernetes Operator pattern** (using Kopf) over a simple API-driven Terraform/Script approach.
-- **Why?** It makes "Store" a first-class Kubernetes citizen. The operator allows for active reconciliation (self-healing), easy status reporting, and native integration with K8s events.
-- **Tradeoff**: Higher complexity than a simple script, but significantly more robust for day-2 operations.
+```bash
+curl -sfL https://get.k3s.io | sh -
+```
 
-### Idempotency & Failure Handling
-- **Idempotency**: The operator checks for existing resources before creating them. Updating a `Store` CR updates the underlying Helm release.
-- **Failure Handling**: If a provisioning step fails (e.g., Helm chart error), the operator retries with exponential backoff. The error is captured and displayed in the Dashboard.
-- **Cleanup**: We use **Finalizers**. When you delete a Store, the operator intercepts the deletion, uninstalls the Helm release, deletes the Namespace, and only then allows the CR to be removed. This prevents "orphaned" resources.
+2. Build and push images to your registry.
 
-### Production Considerations
-To move this from `kind` to Production, change the following:
-1. **DNS**: Replace `nip.io` with a real DNS provider (Cloudflare, AWS Route53) and ExternalDNS.
-2. **Ingress**: Use a production Ingress Class (e.g., Nginx, ALB) with **Cert-Manager** for automatic Let's Encrypt SSL.
-3. **Storage**: Switch from `standard` (hostPath) to a managed CSI driver (e.g., EBS gp3, Longhorn).
-4. **Secrets**: Integrate with Vault or AWS Secrets Manager instead of native K8s Secrets for sensitive credentials.
-5. **Observability**: Add Prometheus/Grafana for monitoring controller health and store metrics.
+```bash
+docker build -t your-repo/platform-api:latest -f apps/api/Dockerfile .
+docker build -t your-repo/store-controller:latest -f controller/Dockerfile .
+docker build --build-arg VITE_API_BASE=http://api.your-domain.com -t your-repo/dashboard:latest apps/dashboard
+
+docker push your-repo/platform-api:latest
+docker push your-repo/store-controller:latest
+docker push your-repo/dashboard:latest
+```
+
+3. Start from `charts/platform/values-prod.yaml` and set:
+- `baseDomain` to your real domain
+- image references to your pushed tags
+- ingress class/annotations for your ingress controller
+- TLS/storage/replica/resource values for your environment
+
+4. Deploy:
+
+```bash
+helm upgrade --install store-platform charts/platform \
+  --namespace store-platform --create-namespace \
+  -f charts/platform/values-prod.yaml
+```
+
+## How To Create a Store and Place an Order
+
+### Create a store (Dashboard path)
+
+1. Open the dashboard.
+2. Enter a unique store ID, for example `fashion-boutique`.
+3. Select engine `woocommerce`.
+4. Click launch.
+5. Wait for status transition `Provisioning -> Ready`.
+
+### Create a store (API path)
+
+```bash
+curl -X POST http://api.127.0.0.1.nip.io/stores \
+  -H 'Content-Type: application/json' \
+  -d '{"engine":"woocommerce","storeId":"demo1"}'
+```
+
+Inspect status/events:
+
+```bash
+curl http://api.127.0.0.1.nip.io/stores/demo1 | jq
+curl http://api.127.0.0.1.nip.io/stores/demo1/events | jq
+```
+
+### Place an order
+
+1. Open the generated store URL from dashboard/API response.
+2. Add a product to cart and proceed to checkout.
+3. Place an order (COD flow is enabled by default in the demo setup).
+4. Optional admin verification: use `/wp-admin` credentials from secret `store-<STORE_ID>/store-admin`.
+
+## Helm Charts and Values (Local vs Prod)
+
+Platform chart (`charts/platform`):
+- `charts/platform/values.yaml`: baseline defaults
+- `charts/platform/values-local.yaml`: local Kind profile (`nip.io`, local image wiring)
+- `charts/platform/values-prod.yaml`: production-like profile (real domain, prod image refs, stricter resources)
+
+Store charts:
+- `charts/woocommerce`: WooCommerce store deployment wrapper
+- `charts/medusa`: Medusa stub chart for next engine path
+
+No chart fork is required between local and production-like setups; differences are values-driven.
+
+## Operations Guide
+
+### Platform install / upgrade
+
+Install:
+
+```bash
+helm upgrade --install store-platform charts/platform \
+  --namespace store-platform --create-namespace \
+  -f charts/platform/values-local.yaml
+```
+
+Upgrade with production values:
+
+```bash
+helm upgrade store-platform charts/platform \
+  --namespace store-platform \
+  -f charts/platform/values-prod.yaml
+```
+
+### Rollback
+
+```bash
+helm history store-platform -n store-platform
+helm rollback store-platform <REVISION> -n store-platform
+```
+
+### Store lifecycle operations
+
+Create:
+
+```bash
+curl -X POST http://api.127.0.0.1.nip.io/stores \
+  -H 'Content-Type: application/json' \
+  -d '{"engine":"woocommerce","storeId":"demo1"}'
+```
+
+Inspect:
+
+```bash
+curl http://api.127.0.0.1.nip.io/stores/demo1 | jq
+curl http://api.127.0.0.1.nip.io/stores/demo1/events | jq
+```
+
+Delete:
+
+```bash
+curl -X DELETE http://api.127.0.0.1.nip.io/stores/demo1
+```
+
+### Troubleshooting
+
+Store stuck in provisioning:
+
+```bash
+kubectl logs -n store-platform deploy/store-controller -f
+kubectl get stores.stores.urumi.ai -n store-platform <STORE_ID> -o yaml
+kubectl get all -n store-<STORE_ID>
+kubectl get events -n store-<STORE_ID> --sort-by=.lastTimestamp
+```
+
+Helm release failed:
+
+```bash
+helm list -n store-<STORE_ID>
+helm status woocommerce-<STORE_ID> -n store-<STORE_ID>
+```
+
+Cleanup verification:
+
+```bash
+kubectl get ns store-<STORE_ID>
+kubectl get ns store-<STORE_ID> -o yaml
+```
+
+### Demo checklist
+
+1. Show architecture and component responsibilities.
+2. Create a store from dashboard.
+3. Show namespace/resources appearing.
+4. Show status transitions to ready with URL.
+5. Place/verify an order.
+6. Delete store and verify namespace cleanup.
+7. Explain guardrails, security posture, and rollback.
+
+## System Design and Tradeoffs
+
+### Architecture choice
+
+This platform uses Kubernetes-native reconciliation with a custom `Store` CRD:
+1. Dashboard/API are stateless control-plane services.
+2. API writes desired state by creating/updating `Store` CRs.
+3. Operator reconciles desired state into namespace + policies + per-store Helm release.
+
+Tradeoff:
+- More moving parts than a script-only approach.
+- Better day-2 behavior: retries, self-healing, consistent status surfaces.
+
+### Idempotency, failure handling, and cleanup
+
+Idempotency:
+- `POST /stores` is idempotent for the same `storeId + engine`.
+- Operator provisioning uses `helm upgrade --install`.
+- Reconciliation on resume re-attempts non-terminal stores.
+- Namespace/policy reconciliation is upsert-style.
+
+Failure handling:
+- Explicit state transitions: `Provisioning -> Ready | Failed`.
+- Step-level bounded event timeline in status.
+- `status.lastError` tracks the latest failure.
+- Concurrency caps (`MAX_CONCURRENT_PROVISIONS`) and timeout caps (`MAX_PROVISION_SECONDS`) reduce blast radius and hangs.
+
+Cleanup:
+- Finalizer-based delete flow: uninstall release, delete namespace, then remove finalizer.
+- Delete path is resilient when resources are already absent.
+
+### What changes for production
+
+Key values and infra changes for a real environment:
+1. DNS: replace `nip.io` with real DNS + ExternalDNS.
+2. Ingress/TLS: production ingress class and cert-manager/managed certificates.
+3. Storage class: managed CSI-backed class instead of local defaults.
+4. Secrets: integrate Vault or cloud secrets manager for sensitive credentials.
+5. Image registry/tags: immutable tags from CI/CD.
+6. Resources/replicas: tune requests/limits and horizontal redundancy.
+7. Observability: Prometheus/Grafana/log aggregation for operator and store workloads.
