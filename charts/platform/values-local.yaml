@@ -1,0 +1,15 @@
+baseDomain: "127.0.0.1.nip.io"
+urlScheme: "http"
+ingressClassName: "nginx"
+
+images:
+  api: "urumi/platform-api:local"
+  controller: "urumi/store-controller:local"
+  dashboard: "urumi/dashboard:local"
+
+storageClass: ""
+
+ingress:
+  annotations: {}
+  tls:
+    enabled: false

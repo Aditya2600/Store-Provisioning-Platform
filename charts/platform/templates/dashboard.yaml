@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+spec:
+  replicas: {{ .Values.replicaCount.dashboard }}
+  selector:
+    matchLabels: { app: dashboard }
+  template:
+    metadata:
+      labels: { app: dashboard }
+    spec:
+      serviceAccountName: dashboard
+      {{- with .Values.podSecurityContext.dashboard }}
+      securityContext: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: dashboard
+          image: {{ .Values.images.dashboard }}
+          imagePullPolicy: IfNotPresent
+          {{- with .Values.containerSecurityContext.dashboard }}
+          securityContext: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources: {{ toYaml .Values.resources.dashboard | nindent 12 }}
+          volumeMounts:
+            - name: dashboard-runtime-config
+              mountPath: /usr/share/nginx/html/config.js
+              subPath: config.js
+      volumes:
+        - name: dashboard-runtime-config
+          configMap:
+            name: dashboard-runtime-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+spec:
+  selector: { app: dashboard }
+  ports:
+    - port: 80
+      targetPort: 80

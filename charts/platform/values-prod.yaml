@@ -1,0 +1,24 @@
+# Example production-like values for k3s/VPS deployment.
+# Replace with your real domain and image registry tags.
+baseDomain: "1.2.3.4.nip.io"
+urlScheme: "http"
+ingressClassName: "nginx"
+
+images:
+  api: "YOUR_REGISTRY/platform-api:TAG"
+  controller: "YOUR_REGISTRY/store-controller:TAG"
+  dashboard: "YOUR_REGISTRY/dashboard:TAG"
+
+storageClass: "local-path"
+
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+  tls:
+    enabled: false
+    secretName: ""
+
+replicaCount:
+  api: 2
+  controller: 1
+  dashboard: 2

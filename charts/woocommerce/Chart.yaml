@@ -1,0 +1,11 @@
+apiVersion: v2
+name: woocommerce
+description: Per-store WooCommerce (WordPress + WooCommerce plugin)
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+
+dependencies:
+  - name: wordpress
+    version: ">=20.0.0"
+    repository: "https://charts.bitnami.com/bitnami"

@@ -1,0 +1,2 @@
+WooCommerce store installed.
+Host: {{ default "(set wordpress.ingress.hostname)" .Values.wordpress.ingress.hostname }}

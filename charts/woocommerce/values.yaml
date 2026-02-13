@@ -1,0 +1,16 @@
+# Controller passes values under the dependency scope, e.g.
+# wordpress.ingress.hostname, wordpress.wordpressUsername, wordpress.wordpressPassword.
+wordpress:
+  ingress:
+    enabled: true
+    ingressClassName: ""
+    hostname: ""
+    path: /
+  wordpressPlugins: "woocommerce"
+  # You can add init scripts (wp-cli) here if needed
+  customPostInitScripts:
+    01-install-woocommerce.sh: |
+      #!/bin/bash
+      set -e
+      echo "Ensuring WooCommerce plugin is installed/active..."
+      wp plugin install woocommerce --activate || true

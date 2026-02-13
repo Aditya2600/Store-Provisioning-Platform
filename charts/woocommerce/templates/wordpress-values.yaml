@@ -1,0 +1,2 @@
+# Values are passed via .Values.* from controller using --set, but this wrapper keeps them in the dependency scope.
+# We simply render nothing; values are consumed by the dependency chart.

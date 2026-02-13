@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-api
+spec:
+  replicas: {{ .Values.replicaCount.api }}
+  selector:
+    matchLabels: { app: platform-api }
+  template:
+    metadata:
+      labels: { app: platform-api }
+    spec:
+      serviceAccountName: platform-api
+      {{- with .Values.podSecurityContext.api }}
+      securityContext: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: api
+          image: {{ .Values.images.api }}
+          imagePullPolicy: IfNotPresent
+          {{- with .Values.containerSecurityContext.api }}
+          securityContext: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: PLATFORM_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: MAX_ACTIVE_STORES
+              value: {{ .Values.guardrails.maxActiveStores | quote }}
+            - name: MAX_STORES_PER_IP
+              value: {{ .Values.guardrails.maxStoresPerIp | quote }}
+            - name: CREATE_RATE_LIMIT
+              value: {{ .Values.guardrails.createRateLimit | quote }}
+            - name: RATE_WINDOW_SECONDS
+              value: {{ .Values.guardrails.rateWindowSeconds | quote }}
+            - name: CORS_ALLOW_ORIGINS
+              value: {{ .Values.api.corsAllowOrigins | quote }}
+            - name: EVENTS_LIMIT
+              value: {{ .Values.api.eventsLimit | quote }}
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: HOME
+              value: "/tmp"
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources: {{ toYaml .Values.resources.api | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-api
+spec:
+  selector: { app: platform-api }
+  ports:
+    - port: 80
+      targetPort: 8000

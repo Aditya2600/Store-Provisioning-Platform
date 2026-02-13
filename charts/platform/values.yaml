@@ -1,0 +1,95 @@
+baseDomain: "127.0.0.1.nip.io"
+urlScheme: "http"
+ingressClassName: "nginx"
+
+ingress:
+  annotations: {}
+  tls:
+    enabled: false
+    secretName: ""
+
+images:
+  api: "urumi/platform-api:local"
+  controller: "urumi/store-controller:local"
+  dashboard: "urumi/dashboard:local"
+
+replicaCount:
+  api: 1
+  controller: 1
+  dashboard: 1
+
+resources:
+  api:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  controller:
+    requests:
+      cpu: 150m
+      memory: 256Mi
+    limits:
+      cpu: 800m
+      memory: 1Gi
+  dashboard:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+guardrails:
+  maxActiveStores: 5
+  maxStoresPerIp: 3
+  createRateLimit: 5
+  rateWindowSeconds: 60
+
+controller:
+  maxProvisionSeconds: 900
+  maxConcurrentProvisions: 2
+  maxStatusEvents: 20
+  operatorWorkers: 4
+  storeNamespacePrefix: "store-"
+
+storageClass: ""
+
+api:
+  corsAllowOrigins: "*"
+  eventsLimit: 20
+
+dashboard:
+  apiBase: ""
+
+podSecurityContext:
+  api:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+  controller:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+  dashboard: {}
+
+containerSecurityContext:
+  api:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+  controller:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+  dashboard:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop: ["ALL"]
+      add: ["CHOWN", "SETGID", "SETUID"]

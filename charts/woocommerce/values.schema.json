@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "wordpress": {
+      "type": "object",
+      "properties": {
+        "ingress": { "type": "object" },
+        "wordpressUsername": { "type": "string" },
+        "wordpressPassword": { "type": "string" },
+        "wordpressEmail": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,2 @@
+# This chart wraps bitnami/wordpress as a dependency.
+# We map top-level values into the dependency.
