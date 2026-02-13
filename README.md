@@ -12,6 +12,16 @@ A Kubernetes-native platform for provisioning isolated e-commerce stores (WooCom
 
 ---
 
+## Demo
+
+**Dashboard**
+![Dashboard](assets/dashboard.png)
+
+**Storefront**
+![Storefront](assets/store.png)
+
+---
+
 ## 🚀 Setup Instructions
 
 ### 1. Local Setup (Kind)
